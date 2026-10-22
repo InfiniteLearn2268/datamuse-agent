@@ -1,6 +1,7 @@
 import html
 import time
 
+import markdown as md
 import requests
 import streamlit as st
 
@@ -198,7 +199,44 @@ header {
     margin: 15px 0;
     max-width: 80%;
     color: #3D352F;
-    white-space: pre-wrap;
+}
+
+/* The assistant's answer is rendered from real Markdown (bold, tables,
+   lists) into HTML -- these rules style that HTML cleanly instead of
+   relying on raw whitespace like the plain-text version did. */
+.ai-message p {
+    margin: 0 0 10px 0;
+}
+
+.ai-message p:last-child {
+    margin-bottom: 0;
+}
+
+.ai-message strong {
+    color: #2A241F;
+}
+
+.ai-message table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0;
+    font-size: 14px;
+}
+
+.ai-message th, .ai-message td {
+    border: 1px solid #E7DDD3;
+    padding: 6px 12px;
+    text-align: left;
+}
+
+.ai-message th {
+    background: #FBF7F1;
+    font-weight: 600;
+}
+
+.ai-message ul, .ai-message ol {
+    margin: 6px 0 10px 20px;
+    padding: 0;
 }
 
 .ai-message.clarify {
@@ -260,18 +298,28 @@ def reset_session():
 
 
 def render_message(role: str, text: str, kind: str = "normal"):
-    """Renders one chat bubble. `text` is HTML-escaped so a question or
-    answer containing <, >, & etc. can't break the page layout."""
-    safe_text = html.escape(text)
+    """Renders one chat bubble.
+
+    User messages are plain typed text -- these are HTML-escaped so a
+    question containing <, >, & etc. can't break the page layout.
+
+    Assistant messages come from the LLM, which often formats its answers
+    using Markdown (**bold**, tables, lists). Those are converted from
+    Markdown into real HTML here, so a table renders as an actual compact
+    table and **bold** renders as bold -- instead of showing the raw
+    Markdown syntax and the large blank gaps that come from preserving
+    every blank line literally."""
     if role == "user":
+        safe_text = html.escape(text)
         st.markdown(f'<div class="user-message">{safe_text}</div>', unsafe_allow_html=True)
     else:
+        rendered = md.markdown(text, extensions=["tables", "nl2br"])
         css_class = "ai-message"
         if kind == "clarify":
             css_class += " clarify"
         elif kind == "error":
             css_class += " error"
-        st.markdown(f'<div class="{css_class}">{safe_text}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="{css_class}">{rendered}</div>', unsafe_allow_html=True)
 
 
 def handle_backend_result(result: dict):
